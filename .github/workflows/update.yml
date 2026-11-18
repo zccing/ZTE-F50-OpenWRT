@@ -41,7 +41,7 @@ jobs:
 
           paths=()
           has_updates=false
-          failed=false
+          failed=()
 
           collect_result() {
             local title=$1 pid=$2 log=$3
@@ -53,8 +53,7 @@ jobs:
             echo '::endgroup::'
 
             if (( result != 0 )); then
-              failed=true
-              echo "::error title=$title::退出状态 $result"
+              failed+=("$title（退出状态 $result）")
               return
             fi
 
@@ -71,7 +70,7 @@ jobs:
 
           {
             echo "has_updates=$has_updates"
-            echo "failed=$failed"
+            echo "failed=${failed[*]}"
             echo 'paths<<EOF'
             printf '%s\n' "${paths[@]}"
             echo 'EOF'
@@ -91,5 +90,9 @@ jobs:
           add-paths: ${{ steps.update.outputs.paths }}
 
       - name: 报告检查失败
-        if: steps.update.outputs.failed == 'true'
-        run: exit 1
+        if: steps.update.outputs.failed != ''
+        env:
+          FAILED_UPDATES: ${{ steps.update.outputs.failed }}
+        run: |
+          echo "::error::$FAILED_UPDATES。详见「并行检查工具和底包更新」的对应日志。"
+          exit 1

@@ -102,10 +102,11 @@ def termux_tools():
         if not filename.startswith("pool/") or ".." in Path(filename).parts:
             raise ValueError(f"Termux 包索引包含未知路径：{filename}")
         deb = download(TERMUX_URL + filename, size=int(package["Size"]), sha256=package["SHA256"])
-        contents = subprocess.run(
-            ["dpkg-deb", "--fsys-tarfile", "-"],
-            input=deb, stdout=subprocess.PIPE, check=True,
-        ).stdout
+        # dpkg-deb 1.23.7 会把管道读入的包误判为截断。
+        with tempfile.TemporaryDirectory() as directory:
+            deb_path = Path(directory) / f"{name}.deb"
+            deb_path.write_bytes(deb)
+            contents = subprocess.check_output(["dpkg-deb", "--fsys-tarfile", str(deb_path)])
         with tarfile.open(fileobj=io.BytesIO(contents)) as archive:
             member = archive.getmember(f"./data/data/com.termux/files/usr/{path}")
             if not member.isfile():
