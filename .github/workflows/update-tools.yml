@@ -1,0 +1,38 @@
+name: 更新刷机工具
+
+on:
+  schedule:
+    - cron: '23 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency: update-tools
+
+jobs:
+  update:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: 下载并核对工具
+        run: python3 tools/update-tools.py
+      - name: 创建更新 PR
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
+        with:
+          branch: automation/update-tools
+          delete-branch: true
+          commit-message: 'chore: 更新刷机工具'
+          title: 更新刷机工具
+          body: |
+            此 PR 由工具更新工作流生成。下载地址和包名见 `tools/README.md`。
+            合并前请在 F50 上验证受影响的命令。镜像工具有更新时，按制作镜像指南检查它们能在原厂 Android 上运行。
+          add-paths: |
+            tools/platform-tools/
+            tools/zadig-*.exe
+            tools/f50-image-tools/
