@@ -1,11 +1,23 @@
-| 公共文件 | 用途 | SHA-256 | 获取链接 |
-|---|---|---|---|
-| Image | Linux 内核 | `94240dff47e5cbffd969d43049512a4f13f75b76298b1769f186fc98e6da5de8` |  [mu300-kernel.tar.gz 包内的 Image](https://github.com/dikeckaan/mu300-linux/releases)。|
-| common.lz4 | 基础 ramdisk，含 BusyBox 和内核模块 | `c72b25fb9f8bddd771c6d1df835fc543e5c4a43b84de9324b98ae26e6c7df36e` | [mu300-kernel.tar.gz 包内的 ramdisk-generic.lz4](https://github.com/dikeckaan/mu300-linux/releases)。|
-| rescue.lz4 | 救援启动逻辑 | `79f2cfafcfd83d33c80d290de6a5fb1364a6085fc65cb2f43c6dd003d4dbbe25` | [基于 boot/init 源码生成的](https://github.com/dikeckaan/mu300-linux/blob/main/boot/init)。 |
-| normal.lz4 | 正式启动逻辑 | `a797ffcc74f3b9006521fa5762b844c9eb63aa5fa1d4fc472ef9ae03e5948134` | [基于 boot/init 源码生成的](https://github.com/dikeckaan/mu300-linux/blob/main/boot/init)。 |
-| emmc.img.gz | 内置 eMMC 的 OpenWrt 系统底包 | `28f43ed3c83839e303c22a626e20dbb7b498c1472e4282b3136d90dddc527f64` | [mu300-openwrt-luci-rootfs.tar.gz](https://github.com/dikeckaan/mu300-linux/releases)。|
+# F50 公共底包
 
+| 公共文件 | 用途 | 来源 |
+| --- | --- | --- |
+| `Image` | Linux 5.4 内核 | [MU300 Linux Releases](https://github.com/dikeckaan/mu300-linux/releases) 的 `mu300-kernel.tar.gz` 内的 `Image` |
+| `common.lz4` | 基础 ramdisk，含 BusyBox 和内核模块 | 同一内核包内的 `ramdisk-generic.lz4` |
+| `rescue.lz4` | F50 救援启动 | 基于 [MU300 Linux 的 boot/init](https://github.com/dikeckaan/mu300-linux/blob/main/boot/init) 制作。更新系统底包时同步写入 eMMC 镜像的校验值 |
+| `normal.lz4` | F50 正式启动 | 基于同一 `boot/init` 制作，含本仓库的 F50 启动逻辑 |
+| `emmc.img.gz` | 2 GiB eMMC 系统底包 | 用同一发行版的 `mu300-openwrt-luci-rootfs.tar.gz` 构建 |
 
-TODO:
-需要新增一个自动更新这些内容的脚本，然后自动生成一个 sha256 校验文件， F50 上直接使用 sha256sum 来校验
+五个文件的校验值保存在 [SHA256SUMS](SHA256SUMS)。把整个 `payload` 目录传到 F50 后，进入该目录运行 `sha256sum -c SHA256SUMS`。
+
+## 更新底包
+
+在装有 Python 3.9+、`e2fsprogs`、`fakeroot` 和 `lz4` 的 Debian、Ubuntu 或 WSL 中，从仓库根目录运行：
+
+```sh
+python3 payload/update-payload.py
+```
+
+脚本默认使用 MU300 Linux 最新正式版，也可用 `--release` 指定发行标签。运行时会显示所用版本，并同时生成校验清单。当前底包已对应同一组上游文件且通过校验时，会跳过重建。只想为已有文件生成清单时，添加 `--checksums-only`。
+
+「更新刷机文件」工作流每周一北京时间 08:23 并行检查底包和工具，也可在 Actions 页面手动运行。任一项有变动就创建或刷新同一个 PR。仓库需要开启 **Allow GitHub Actions to create and approve pull requests**。合并前请在 F50 上验证镜像制作和启动。

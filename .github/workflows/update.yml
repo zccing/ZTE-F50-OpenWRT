@@ -1,0 +1,95 @@
+name: 更新刷机文件
+
+on:
+  schedule:
+    - cron: '23 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency: update-f50-files
+
+jobs:
+  update:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 并行检查工具和底包更新
+        id: update
+        shell: bash
+        run: |
+          tools_log="$RUNNER_TEMP/f50-update-tools.log"
+          payload_log="$RUNNER_TEMP/f50-update-payload.log"
+
+          python3 tools/update-tools.py > "$tools_log" 2>&1 &
+          tools_pid=$!
+
+          (
+            set -e
+            sudo apt-get update
+            sudo apt-get install -y e2fsprogs fakeroot lz4
+            python3 payload/update-payload.py
+          ) > "$payload_log" 2>&1 &
+          payload_pid=$!
+
+          paths=()
+          has_updates=false
+          failed=false
+
+          collect_result() {
+            local title=$1 pid=$2 log=$3
+            shift 3
+            local result=0
+            wait "$pid" || result=$?
+            echo "::group::$title"
+            cat "$log"
+            echo '::endgroup::'
+
+            if (( result != 0 )); then
+              failed=true
+              echo "::error title=$title::退出状态 $result"
+              return
+            fi
+
+            paths+=("$@")
+            if [[ -n "$(git status --porcelain --untracked-files=all -- "$@")" ]]; then
+              has_updates=true
+            fi
+          }
+
+          collect_result '更新刷机工具' "$tools_pid" "$tools_log" \
+            tools/platform-tools/ 'tools/zadig-*.exe' tools/f50-image-tools/ tools/SHA256SUMS
+          collect_result '更新 F50 底包' "$payload_pid" "$payload_log" \
+            payload/Image payload/common.lz4 payload/rescue.lz4 payload/emmc.img.gz payload/SHA256SUMS
+
+          {
+            echo "has_updates=$has_updates"
+            echo "failed=$failed"
+            echo 'paths<<EOF'
+            printf '%s\n' "${paths[@]}"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: 创建更新 PR
+        if: steps.update.outputs.has_updates == 'true'
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
+        with:
+          branch: automation/update-f50-files
+          delete-branch: true
+          commit-message: 'chore: 更新刷机文件'
+          title: 更新刷机文件
+          body: |
+            工具和底包的上游版本见工作流日志。合并前请在 F50 上验证受影响的工具和镜像制作步骤。
+            底包有更新时，请同时验证救援启动和 OpenWrt 启动。
+          add-paths: ${{ steps.update.outputs.paths }}
+
+      - name: 报告检查失败
+        if: steps.update.outputs.failed == 'true'
+        run: exit 1

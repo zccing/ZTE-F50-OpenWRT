@@ -8,6 +8,13 @@
 .\tools\platform-tools\adb.exe shell mkdir -p /data/local/tmp/
 # 上传工具
 .\tools\platform-tools\adb.exe push .\tools\f50-image-tools /data/local/tmp/
+# 校验工具
+.\tools\platform-tools\adb.exe shell 'cd /data/local/tmp/f50-image-tools && sha256sum -c SHA256SUMS'
+```
+
+看到六个工具文件都显示 `OK` 后，再设置执行权限并检查工具能否运行。
+
+```powershell
 # 增加执行权限
 .\tools\platform-tools\adb.exe shell chmod 700 /data/local/tmp/f50-image-tools/lz4 /data/local/tmp/f50-image-tools/debugfs /data/local/tmp/f50-image-tools/cpio
 
@@ -22,10 +29,10 @@
 .\tools\platform-tools\adb.exe push .\payload /data/local/tmp/f50-openwrt-build/
 
 # 验证
-.\tools\platform-tools\adb.exe shell 'cd /data/local/tmp/f50-openwrt-build/payload && sha256sum Image common.lz4 rescue.lz4 normal.lz4 emmc.img.gz'
+.\tools\platform-tools\adb.exe shell 'cd /data/local/tmp/f50-openwrt-build/payload && sha256sum -c SHA256SUMS'
 ```
 
-把最后显示的五个 SHA-256 值按文件名和清单对照。全部一致再继续。[底包校验清单](../payload/README.md)
+看到五个文件都显示 `OK` 后再继续。
 
 ## 2. 读取本机备份和运行文件
 

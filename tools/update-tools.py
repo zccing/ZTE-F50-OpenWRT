@@ -120,6 +120,30 @@ def termux_tools():
     return files
 
 
+def sha256sums(files):
+    return "".join(
+        f"{hashlib.sha256(data).hexdigest()}  {path.as_posix()}\n"
+        for path, data in sorted(files.items())
+    ).encode("ascii")
+
+
+def with_checksums(tools_dir, files):
+    image_tools_dir = Path("f50-image-tools")
+    image_tools = {
+        path.relative_to(image_tools_dir): data
+        for path, data in files.items()
+        if path.parent == image_tools_dir
+    }
+    pinned_tools = {
+        Path(name): (tools_dir / name).read_bytes()
+        for name in ("spd_dump.exe", "libusb-1.0.dll")
+    }
+    return files | {
+        Path("SHA256SUMS"): sha256sums(files | pinned_tools),
+        image_tools_dir / "SHA256SUMS": sha256sums(image_tools),
+    }
+
+
 def install(tools_dir, files):
     changes = {}
     for path, data in files.items():
@@ -169,4 +193,5 @@ def install(tools_dir, files):
 
 if __name__ == "__main__":
     tools_dir = Path(__file__).resolve().parent
-    install(tools_dir, platform_tools() | zadig() | termux_tools())
+    files = platform_tools() | zadig() | termux_tools()
+    install(tools_dir, with_checksums(tools_dir, files))
